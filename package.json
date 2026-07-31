@@ -1,6 +1,6 @@
 {
   "name": "@ondrotoman/lektor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "access": "public",
   "description": "Interactive step-by-step tutorials for web apps",
   "main": "dist/index.js",
@@ -16,7 +16,11 @@
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["tutorial", "step-by-step", "guide"],
+  "keywords": [
+    "tutorial",
+    "step-by-step",
+    "guide"
+  ],
   "author": "Ondrej Toman",
   "license": "MIT",
   "devDependencies": {
