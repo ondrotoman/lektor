@@ -1,9 +1,9 @@
-import NoStepsException from './exceptions/NoStepsException'
-import type { LektorParams } from './interfaces/LektorParams'
-import type Listener from './interfaces/Listener'
-import Step from './step'
-import type { Callable } from './types/Callable'
-import { Position } from './enums/Position'
+import NoStepsException from './exceptions/NoStepsException.js'
+import type { LektorParams } from './interfaces/LektorParams.js'
+import type Listener from './interfaces/Listener.js'
+import type { Callable } from './types/Callable.js'
+import { Position } from './enums/Position.js'
+import type { Step } from './step.js'
 
 export default class Lektor implements Listener<Step> {
   /**

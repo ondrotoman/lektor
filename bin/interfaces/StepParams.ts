@@ -1,5 +1,5 @@
-import type { Position } from '../enums/Position'
-import type { StepMountHook, StepUnmountHook } from '../types/StepHooks'
+import type { Position } from '../enums/Position.js'
+import type { StepMountHook, StepUnmountHook } from '../types/StepHooks.js'
 
 export default interface StepParams {
   element: HTMLElement | null

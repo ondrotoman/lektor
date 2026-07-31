@@ -1,4 +1,4 @@
-import type Listener from './Listener'
+import type Listener from './Listener.js'
 
 export default interface Notifier {
   setListener(listener: Listener<Notifier>): void

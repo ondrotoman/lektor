@@ -1,0 +1,25 @@
+{
+  "name": "@ondrotoman/lektor",
+  "version": "1.0.0",
+  "access": "public",
+  "description": "Interactive step-by-step tutorials for web apps",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "directories": {
+    "test": "tests"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["tutorial", "step-by-step", "guide"],
+  "author": "Ondrej Toman",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

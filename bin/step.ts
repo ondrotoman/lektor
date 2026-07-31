@@ -1,10 +1,10 @@
-import { Position } from './enums/Position'
-import type Listener from './interfaces/Listener'
-import type Notifier from './interfaces/Notifier'
-import type StepParams from './interfaces/StepParams'
-import type { StepMountHook, StepUnmountHook } from './types/StepHooks'
+import { Position } from './enums/Position.js'
+import type Listener from './interfaces/Listener.js'
+import type Notifier from './interfaces/Notifier.js'
+import type StepParams from './interfaces/StepParams.js'
+import type { StepMountHook, StepUnmountHook } from './types/StepHooks.js'
 
-export default class Step implements Notifier {
+export class Step implements Notifier {
   private _element: HTMLElement | null = null
   private _listeners: Listener<Step>[] = []
   private _body: string = ''
