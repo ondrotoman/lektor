@@ -1,16 +1,22 @@
 {
   "name": "@ondrotoman/lektor",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "access": "public",
   "description": "Interactive step-by-step tutorials for web apps",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ondrotoman/lektor"
+  },
   "directories": {
     "test": "tests"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE.md",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
@@ -18,8 +24,11 @@
   },
   "keywords": [
     "tutorial",
+    "site tour",
+    "tour",
     "step-by-step",
-    "guide"
+    "guide",
+    "lektor"
   ],
   "author": "Ondrej Toman",
   "license": "MIT",

@@ -1,23 +1,16 @@
 import { Position } from './enums/Position.js';
 export class Step {
     _element = null;
-    _listeners = [];
     _body = '';
-    /**
-     * Default dialog position
-     */
+    _header = null;
+    _listeners = [];
     _dialogPosition;
-    /**
-     * Callback for element click
-     */
     _onMounted = null;
-    /**
-     * Callback for element click
-     */
     _onUnmounted = null;
     constructor(params) {
-        this._element = params.element;
+        this._element = params.element ?? null;
         this._body = params.body;
+        this._header = params.header ?? null;
         this._dialogPosition = params.dialogPosition ?? Position.BOTTOM;
         this._onMounted = params.onMounted ?? null;
         this._onUnmounted = params.onUnmounted ?? null;
@@ -25,16 +18,26 @@ export class Step {
     get element() {
         return this._element;
     }
-    set element(element) {
+    setElement(element) {
         this._element = element;
         this.notifyListeners();
+        return this;
     }
     get body() {
         return this._body;
     }
-    set body(body) {
+    setBody(body) {
         this._body = body;
         this.notifyListeners();
+        return this;
+    }
+    get header() {
+        return this._header;
+    }
+    setHeader(header) {
+        this._header = header;
+        this.notifyListeners();
+        return this;
     }
     get dialogPosition() {
         return this._dialogPosition;
@@ -45,9 +48,6 @@ export class Step {
     get onUnmounted() {
         return this._onUnmounted;
     }
-    static make = (step) => {
-        return new Step(step);
-    };
     notifyListeners = () => {
         this._listeners.forEach((listener) => listener?.notify(this));
     };

@@ -6,26 +6,17 @@ import type { StepMountHook, StepUnmountHook } from './types/StepHooks.js'
 
 export class Step implements Notifier {
   private _element: HTMLElement | null = null
-  private _listeners: Listener<Step>[] = []
   private _body: string = ''
-
-  /**
-   * Default dialog position
-   */
+  private _header: string | null = null
+  private _listeners: Listener<Step>[] = []
   private _dialogPosition: Position
-
-  /**
-   * Callback for element click
-   */
   private _onMounted: StepMountHook | null = null
-  /**
-   * Callback for element click
-   */
   private _onUnmounted: StepUnmountHook | null = null
 
   constructor(params: StepParams) {
-    this._element = params.element
+    this._element = params.element ?? null
     this._body = params.body
+    this._header = params.header ?? null
     this._dialogPosition = params.dialogPosition ?? Position.BOTTOM
     this._onMounted = params.onMounted ?? null
     this._onUnmounted = params.onUnmounted ?? null
@@ -35,18 +26,30 @@ export class Step implements Notifier {
     return this._element
   }
 
-  set element(element: HTMLElement | null) {
+  setElement(element: HTMLElement | null): this {
     this._element = element
     this.notifyListeners()
+    return this
   }
 
   get body(): string {
     return this._body
   }
 
-  set body(body: string) {
+  setBody(body: string): this {
     this._body = body
     this.notifyListeners()
+    return this
+  }
+
+  get header(): string | null {
+    return this._header
+  }
+
+  setHeader(header: string | null): this {
+    this._header = header
+    this.notifyListeners()
+    return this
   }
 
   get dialogPosition(): Position {
@@ -59,10 +62,6 @@ export class Step implements Notifier {
 
   get onUnmounted(): StepUnmountHook | null {
     return this._onUnmounted
-  }
-
-  static make = (step: StepParams): Step => {
-    return new Step(step)
   }
 
   private notifyListeners = (): void => {

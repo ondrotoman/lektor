@@ -1,8 +1,12 @@
+import type Lektor from '../lektor.js';
+import type { Step } from '../step.js';
 export interface LektorCallbacks {
-    previousStep: () => void;
-    nextStep: () => void;
-    disablePreviousButton: () => void;
-    enablePreviousButton: () => void;
-    disableNextButton: () => void;
-    enableNextButton: () => void;
+    previous: () => Lektor;
+    next: () => Lektor;
+    disablePrevious: () => Lektor;
+    enablePrevious: () => Lektor;
+    disableNext: () => Lektor;
+    enableNext: () => Lektor;
+    addStep: (step: Step) => Lektor;
+    removeStep: (step: Step) => Lektor;
 }

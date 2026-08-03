@@ -1,57 +1,21 @@
-import NoStepsException from './exceptions/NoStepsException.js';
 import { Position } from './enums/Position.js';
 export default class Lektor {
-    /**
-     * Tutorial steps
-     */
+    _zIndex = 99990;
     _steps = [];
-    /**
-     * Elements class prefix
-     */
     _classPrefix;
-    /**
-     * Starting Z-index
-     */
-    _zIndex;
-    /**
-     * Header text
-     */
-    _headerText;
-    /**
-     * Previous button text
-     */
+    _header;
     _previousButtonText;
-    /**
-     * Next button text
-     */
+    _isPreviousStepEnabled = true;
     _nextButtonText;
-    /**
-     * End button text
-     */
+    _isNextStepEnabled = true;
     _endButtonText;
-    /**
-     * Dialog offset in pixels
-     */
     _dialogOffset = 10;
-    /**
-     * Callback after start of tutorial
-     */
+    _isKeyboardNavigationEnabled = true;
     _onStart;
-    /**
-     * Callback after end of tutorial
-     */
     _onEnd;
-    /**
-     * Callback after closing the tutorial
-     */
+    _onStepChange;
     _onClose;
-    /**
-     * Track active step
-     */
     _activeStep = null;
-    /**
-     * Remember active step element styling
-     */
     _originalElementStyling = '';
     _layout = null;
     _curtain = null;
@@ -65,52 +29,72 @@ export default class Lektor {
     _dialogNextButton = null;
     _dialogEndButton = null;
     constructor(params) {
-        params.steps.forEach((step) => {
-            step.setListener(this);
-            this._steps.push(step);
-        });
-        this._headerText = params.headerText ?? 'Step: ';
-        this._previousButtonText = params.previousButtonText ?? 'Previous';
-        this._nextButtonText = params.nextButtonText ?? 'Next';
-        this._endButtonText = params.endButtonText ?? 'Done!';
-        this._dialogOffset = params.dialogOffset ?? 10;
+        params?.steps?.forEach((step) => this.addStep(step));
+        this._header = params?.header ?? '';
+        this._previousButtonText = params?.previousButtonText ?? 'Previous';
+        this._nextButtonText = params?.nextButtonText ?? 'Next';
+        this._endButtonText = params?.endButtonText ?? 'Done!';
+        this._dialogOffset = params?.dialogOffset ?? 10;
+        this._isKeyboardNavigationEnabled = params?.enableKeyboardNavigation ?? true;
         this._classPrefix =
-            params.classPrefix === undefined || params.classPrefix === '' ? 'lektor' : params.classPrefix;
-        this._zIndex = params.startingZIndex ?? 9990;
-        this._onStart = params.onStart ?? null;
-        this._onEnd = params.onEnd ?? null;
-        this._onClose = params.onClose ?? null;
+            params?.classPrefix === undefined || params?.classPrefix === ''
+                ? 'lektor'
+                : params?.classPrefix;
+        this._onStart = params?.onStart ?? null;
+        this._onEnd = params?.onEnd ?? null;
+        this._onStepChange = params?.onStepChange ?? null;
+        this._onClose = params?.onClose ?? null;
     }
-    /**
-     *
-     * @param payload
-     */
+    addStep = (step) => {
+        step.setListener(this);
+        this._steps.push(step);
+        return this;
+    };
+    addStepAfter = (step) => {
+        const index = this._steps.indexOf(step);
+        if (index !== -1) {
+            this._steps.splice(index + 1, 0, step);
+        }
+        step.setListener(this);
+        return this;
+    };
+    addStepBefore = (step) => {
+        step.setListener(this);
+        this._steps.push(step);
+        return this;
+    };
+    removeStep = (step) => {
+        const index = this._steps.indexOf(step);
+        if (index !== -1) {
+            this._steps.splice(index, 1);
+        }
+        return this;
+    };
     notify(payload) {
         if (payload === this._activeStep) {
             this.resetActiveStep();
             this.renderActiveStep();
         }
     }
-    /**
-     * Check if the tutorial is running
-     */
     isActive = () => {
         return this._activeStep !== null;
     };
-    /**
-     * Start the tutorial and mount all lektor elements to DOM
-     */
     start = () => {
-        if (!this._steps[0]) {
-            throw new NoStepsException();
+        if (this.isActive()) {
+            return;
         }
-        // Create dialog header
+        this.buildUI();
+        this.enablePreviousStep();
+        this.enableNextStep();
+        this.next();
+        this._onStart?.();
+    };
+    buildUI = () => {
         this._dialogHeaderText = this.createDialogHeaderText();
         this._dialogCloseButton = this.createDialogCloseButton();
         this._dialogHeader = this.createDialogHeader();
         this._dialogHeader.appendChild(this._dialogHeaderText);
         this._dialogHeader.appendChild(this._dialogCloseButton);
-        // Create dialog footer
         this._dialogPreviousButton = this.createDialogPreviousButton();
         this._dialogNextButton = this.createDialogNextButton();
         this._dialogEndButton = this.createDialogEndButton();
@@ -118,52 +102,66 @@ export default class Lektor {
         this._dialogFooter.appendChild(this._dialogPreviousButton);
         this._dialogFooter.appendChild(this._dialogNextButton);
         this._dialogFooter.appendChild(this._dialogEndButton);
-        // Create dialog body
         this._dialogBody = this.createDialogBody();
-        // Create dialog
         this._dialog = this.createDialog();
         this._dialog.appendChild(this._dialogHeader);
         this._dialog.appendChild(this._dialogBody);
         this._dialog.appendChild(this._dialogFooter);
-        // Create curtian
         this._curtain = this.createCurtain();
-        // Create layout
         this._layout = this.createLayout();
         this._layout.appendChild(this._curtain);
         this._layout.appendChild(this._dialog);
         document.body.appendChild(this._layout);
-        this.setActiveStep(this._steps[0]);
         document.addEventListener('scroll', this.moveDialog);
         window.addEventListener('resize', this.moveDialog);
-        this._onStart?.();
+        if (this._isKeyboardNavigationEnabled) {
+            window.addEventListener('keydown', this.handleKeyboardNavigation);
+        }
     };
-    /**
-     * Get callbacks for hooks
-     */
+    handleKeyboardNavigation = (event) => {
+        switch (event.key) {
+            case 'ArrowLeft':
+                this.previous();
+                break;
+            case 'ArrowRight':
+                this.next();
+                break;
+            case 'Enter':
+                this.next();
+                break;
+            case 'Escape':
+                this.end();
+                break;
+            default:
+                return;
+        }
+        event.preventDefault();
+    };
     getHookCallbacks = () => {
         return {
-            previousStep: this.previousStep,
-            nextStep: this.nextStep,
-            disablePreviousButton: this.disablePreviousButton,
-            enablePreviousButton: this.enablePreviousButton,
-            disableNextButton: this.disableNextButton,
-            enableNextButton: this.enableNextButton,
+            previous: this.previous,
+            next: this.next,
+            disablePrevious: this.disablePreviousStep,
+            enablePrevious: this.enablePreviousStep,
+            disableNext: this.disableNextStep,
+            enableNext: this.enableNextStep,
+            addStep: this.addStep,
+            removeStep: this.removeStep,
         };
     };
-    /**
-     * Activate step
-     */
     setActiveStep = (step) => {
         this.resetActiveStep();
         this._activeStep = step;
         this.renderActiveStep();
         this._activeStep.onMounted?.(step.element, this.getHookCallbacks());
+        this._onStepChange?.();
     };
-    /**
-     * Render active step and dialog
-     */
     renderActiveStep = () => {
-        if (this._activeStep?.element) {
+        if (!this._activeStep) {
+            return;
+        }
+        this._dialog?.classList.remove(this.buildClassName('dialog'));
+        if (this._activeStep.element) {
             this._originalElementStyling = this._activeStep.element.style.cssText;
             if (['', 'static'].includes(this._activeStep.element.style.position)) {
                 this._activeStep.element.style.position = 'relative';
@@ -172,7 +170,7 @@ export default class Lektor {
             this._activeStep.element.classList.add(this.buildClassName('active-element'));
         }
         if (this._activeStep?.element && !this.isElementFullyVisible(this._activeStep.element)) {
-            this._activeStep.element.scrollIntoView({
+            this._activeStep.element?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'center',
                 inline: 'nearest',
@@ -181,11 +179,16 @@ export default class Lektor {
         this.setDialogHeaderText();
         this.setDialogBody();
         this.setDialogButtons();
+        this._dialog?.classList.add(this.buildClassName('dialog'));
         this.moveDialog();
     };
-    /**
-     * Move dialog to active step
-     */
+    resetActiveStep = () => {
+        if (this._activeStep?.element) {
+            this._activeStep.element.style.cssText = this._originalElementStyling || '';
+            this._activeStep.element.classList.remove(this.buildClassName('active-element'));
+        }
+        this._activeStep?.onUnmounted?.(this._activeStep.element, this.getHookCallbacks());
+    };
     moveDialog = () => {
         if (!this._dialog || !this._activeStep) {
             return;
@@ -195,6 +198,14 @@ export default class Lektor {
         const activeElementRect = this._activeStep.element?.getBoundingClientRect();
         const dialogRect = this._dialog.getBoundingClientRect();
         if (!activeElementRect) {
+            console.log('bez elementu ' +
+                window.innerHeight +
+                ' / ' +
+                dialogRect.height +
+                ' ' +
+                window.innerWidth +
+                ' / ' +
+                dialogRect.width);
             top = Math.round(window.innerHeight / 2 - dialogRect.height / 2);
             left = Math.round(window.innerWidth / 2 - dialogRect.width / 2);
         }
@@ -227,9 +238,6 @@ export default class Lektor {
         this._dialog.style.top = top + 'px';
         this._dialog.style.left = left + 'px';
     };
-    /**
-     * Check if dialog fits around the element
-     */
     canDialogFit = (position) => {
         if (!this._dialog || !this._activeStep?.element) {
             return false;
@@ -253,9 +261,6 @@ export default class Lektor {
                 return false;
         }
     };
-    /**
-     * Check if element is fully visible
-     */
     isElementFullyVisible(element) {
         const rect = element.getBoundingClientRect();
         return (rect.top >= 0 &&
@@ -263,51 +268,36 @@ export default class Lektor {
             rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
             rect.right <= (window.innerWidth || document.documentElement.clientWidth));
     }
-    /**
-     * Set header text
-     */
     setDialogHeaderText = () => {
-        if (!this._dialogHeaderText || !this._activeStep) {
-            return;
+        if (this._dialogHeaderText && this._activeStep) {
+            this._dialogHeaderText.innerHTML = this._activeStep.header ?? this._header;
         }
-        const index = this._steps.indexOf(this._activeStep);
-        if (index == -1) {
-            return;
-        }
-        this._dialogHeaderText.innerText = `${this._headerText} ${index + 1} / ${this._steps.length}`;
     };
     setDialogBody = () => {
-        this._dialogBody.innerHTML = this._activeStep?.body ?? '';
+        if (this._dialogBody && this._activeStep) {
+            this._dialogBody.innerHTML = this._activeStep.body ?? '';
+        }
     };
-    /**
-     * Set text for dialog buttons
-     */
     setDialogButtons = () => {
-        if (this.getPreviousStep() === null) {
-            this.disablePreviousButton();
+        if (this.getPreviousStep()) {
+            this.enablePreviousStep();
         }
         else {
-            this.enablePreviousButton();
+            this.disablePreviousStep();
         }
-        if (this.getNextStep() === null) {
-            this._dialogNextButton.style.display = 'none';
-            this._dialogEndButton.style.removeProperty('display');
-        }
-        else {
+        if (this.getNextStep()) {
             this._dialogNextButton.style.removeProperty('display');
             this._dialogEndButton.style.display = 'none';
         }
+        else {
+            this._dialogNextButton.style.display = 'none';
+            this._dialogEndButton.style.removeProperty('display');
+        }
     };
-    /**
-     * End tutorial
-     */
     end = () => {
         this.destroy();
         this._onEnd?.();
     };
-    /**
-     * Close tutorial
-     */
     close = () => {
         this.destroy();
         this._onClose?.();
@@ -315,117 +305,103 @@ export default class Lektor {
     destroy = () => {
         this.resetActiveStep();
         this._activeStep = null;
-        this._dialogPreviousButton?.removeEventListener('click', this.previousStep);
-        this._dialogNextButton?.removeEventListener('click', this.nextStep);
+        this._dialogPreviousButton?.removeEventListener('click', this.previous);
+        this._dialogNextButton?.removeEventListener('click', this.next);
         this._dialogCloseButton?.removeEventListener('click', this.close);
         this._dialogEndButton?.removeEventListener('click', this.end);
         document.removeEventListener('scroll', this.renderActiveStep);
         window.removeEventListener('resize', this.renderActiveStep);
+        if (this._isKeyboardNavigationEnabled) {
+            window.removeEventListener('keydown', this.handleKeyboardNavigation);
+        }
         this._layout?.remove();
         this._layout = null;
     };
-    /**
-     * Go to previous step
-     */
-    previousStep = () => {
-        const previousStep = this.getPreviousStep();
-        if (previousStep === null) {
-            return;
+    previous = () => {
+        if (this._isPreviousStepEnabled) {
+            const previousStep = this.getPreviousStep();
+            if (previousStep) {
+                this.setActiveStep(previousStep);
+            }
         }
-        this.setActiveStep(previousStep);
+        return this;
     };
-    /**
-     * Get previous step if there is any
-     */
     getPreviousStep = () => {
+        if (this._steps.length === 0) {
+            return null;
+        }
+        let previousStep = null;
         if (!this._activeStep) {
-            return null;
+            previousStep = this._steps[0];
         }
-        const index = this._steps.indexOf(this._activeStep);
-        if (index === -1) {
-            return null;
+        else {
+            const index = this._steps.indexOf(this._activeStep);
+            if (index !== -1 && this._steps[index - 1]) {
+                previousStep = this._steps[index - 1];
+            }
         }
-        const previousStep = this._steps[index - 1];
-        return previousStep === undefined ? null : previousStep;
+        return previousStep;
     };
-    /**
-     * Go to next step
-     */
-    nextStep = () => {
-        const nextStep = this.getNextStep();
-        if (nextStep === null) {
-            return;
+    disablePreviousStep = () => {
+        this._isPreviousStepEnabled = false;
+        if (this._dialogPreviousButton) {
+            this._dialogPreviousButton.disabled = true;
         }
-        this.setActiveStep(nextStep);
+        return this;
     };
-    /**
-     * Get next step if there is any
-     */
+    enablePreviousStep = () => {
+        this._isPreviousStepEnabled = true;
+        if (this._dialogPreviousButton) {
+            this._dialogPreviousButton.disabled = false;
+        }
+        return this;
+    };
+    next = () => {
+        if (this._isNextStepEnabled) {
+            const nextStep = this.getNextStep();
+            if (nextStep) {
+                this.setActiveStep(nextStep);
+            }
+            else {
+                this.end();
+            }
+        }
+        return this;
+    };
     getNextStep = () => {
-        if (!this._activeStep) {
+        if (this._steps.length === 0) {
             return null;
         }
-        const index = this._steps.indexOf(this._activeStep);
-        if (index === -1) {
-            return null;
-        }
-        const nextStep = this._steps[index + 1];
-        return nextStep === undefined ? null : nextStep;
-    };
-    /**
-     * Reset steps styling to it's original state
-     */
-    resetActiveStep = () => {
+        let nextStep = null;
         if (!this._activeStep) {
-            return;
+            nextStep = this._steps[0];
         }
-        if (this._activeStep.element) {
-            this._activeStep.element.style.cssText = this._originalElementStyling || '';
-            this._activeStep.element.classList.remove(this.buildClassName('active-element'));
+        else {
+            const index = this._steps.indexOf(this._activeStep);
+            if (index !== -1 && this._steps[index + 1]) {
+                nextStep = this._steps[index + 1];
+            }
         }
-        this._activeStep.onUnmounted?.(this._activeStep.element, this.getHookCallbacks());
+        return nextStep;
     };
-    /**
-     * Disable next button
-     */
-    disableNextButton = () => {
+    disableNextStep = () => {
+        this._isNextStepEnabled = false;
         this._dialogNextButton.disabled = true;
+        return this;
     };
-    /**
-     * Enable next button
-     */
-    enableNextButton = () => {
+    enableNextStep = () => {
+        this._isNextStepEnabled = true;
         this._dialogNextButton.disabled = false;
+        return this;
     };
-    /**
-     * Disable previous button
-     */
-    disablePreviousButton = () => {
-        this._dialogPreviousButton.disabled = true;
-    };
-    /**
-     * Enable previous button
-     */
-    enablePreviousButton = () => {
-        this._dialogPreviousButton.disabled = false;
-    };
-    /**
-     * Generate class name for element with given prefix
-     */
     buildClassName = (name) => {
         return [this._classPrefix, name].join('-');
     };
-    /**
-     * Create tutorial layout element
-     */
     createLayout = () => {
         const layout = document.createElement('div');
         layout.classList.add(this.buildClassName('layout'));
         return layout;
     };
-    /**
-     * Create tutorial layout element
-     */
     createCurtain = () => {
         const curtain = document.createElement('div');
         curtain.style.display = 'block';
@@ -438,11 +414,8 @@ export default class Lektor {
         curtain.classList.add(this.buildClassName('curtain'));
         return curtain;
     };
-    /**
-     * Create tutorial dialog
-     */
     createDialog = () => {
-        const dialog = document.createElement('div');
+        const dialog = document.createElement('dialog');
         dialog.style.display = 'flex';
         dialog.style.position = 'absolute';
         dialog.style.top = '0';
@@ -451,25 +424,16 @@ export default class Lektor {
         dialog.classList.add(this.buildClassName('dialog'));
         return dialog;
     };
-    /**
-     * Create tutorial dialog header
-     */
     createDialogHeader = () => {
         const header = document.createElement('header');
         header.classList.add(this.buildClassName('header'));
         return header;
     };
-    /**
-     * Create tutorial dialog header text
-     */
     createDialogHeaderText = () => {
         const headerText = document.createElement('h1');
         headerText.classList.add(this.buildClassName('text'));
         return headerText;
     };
-    /**
-     * Create tutorial dialog clsoe button
-     */
     createDialogCloseButton() {
         const closeButton = document.createElement('button');
         closeButton.classList.add(this.buildClassName('close-button'));
@@ -477,45 +441,30 @@ export default class Lektor {
         closeButton.addEventListener('click', this.close);
         return closeButton;
     }
-    /**
-     * Create tutorial dialog body
-     */
     createDialogBody = () => {
         const body = document.createElement('main');
         body.classList.add(this.buildClassName('body'));
         return body;
     };
-    /**
-     * Create tutorial dialog footer
-     */
     createDialogFooter = () => {
         const body = document.createElement('footer');
         body.classList.add(this.buildClassName('footer'));
         return body;
     };
-    /**
-     * Create dialog previous button
-     */
     createDialogPreviousButton = () => {
         const previousButton = document.createElement('button');
         previousButton.innerText = this._previousButtonText;
         previousButton.classList.add(this.buildClassName('previous-button'));
-        previousButton.addEventListener('click', this.previousStep);
+        previousButton.addEventListener('click', this.previous);
         return previousButton;
     };
-    /**
-     * Create tutorial next button
-     */
     createDialogNextButton = () => {
         const nextButton = document.createElement('button');
         nextButton.innerText = this._nextButtonText;
         nextButton.classList.add(this.buildClassName('next-button'));
-        nextButton.addEventListener('click', this.nextStep);
+        nextButton.addEventListener('click', this.next);
         return nextButton;
     };
-    /**
-     * Create tutorial end button
-     */
     createDialogEndButton = () => {
         const endButton = document.createElement('button');
         endButton.innerText = this._endButtonText;

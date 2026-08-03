@@ -1,4 +1,3 @@
-import NoStepsException from './exceptions/NoStepsException.js'
 import type { LektorParams } from './interfaces/LektorParams.js'
 import type Listener from './interfaces/Listener.js'
 import type { Callable } from './types/Callable.js'
@@ -6,6 +5,11 @@ import { Position } from './enums/Position.js'
 import type { Step } from './step.js'
 
 export default class Lektor implements Listener<Step> {
+  /**
+   * Starting Z-index
+   */
+  private readonly _zIndex: number = 99990
+
   /**
    * Tutorial steps
    */
@@ -17,14 +21,9 @@ export default class Lektor implements Listener<Step> {
   private _classPrefix: string
 
   /**
-   * Starting Z-index
+   * Header text or HTML
    */
-  private _zIndex: number
-
-  /**
-   * Header text
-   */
-  private _headerText: string
+  private _header: string
 
   /**
    * Previous button text
@@ -32,9 +31,19 @@ export default class Lektor implements Listener<Step> {
   private _previousButtonText: string
 
   /**
+   * Check if previous step is enabled
+   */
+  private _isPreviousStepEnabled: boolean = true
+
+  /**
    * Next button text
    */
   private _nextButtonText: string
+
+  /**
+   * Check if next step is enabled
+   */
+  private _isNextStepEnabled: boolean = true
 
   /**
    * End button text
@@ -47,6 +56,11 @@ export default class Lektor implements Listener<Step> {
   private _dialogOffset: number = 10
 
   /**
+   * Check if the keyboard navigation is enabled
+   */
+  private _isKeyboardNavigationEnabled: boolean = true
+
+  /**
    * Callback after start of tutorial
    */
   private _onStart: Callable | null
@@ -55,6 +69,11 @@ export default class Lektor implements Listener<Step> {
    * Callback after end of tutorial
    */
   private _onEnd: Callable | null
+
+  /**
+   * Callback everytime active step changes
+   */
+  private _onStepChange: Callable | null
 
   /**
    * Callback after closing the tutorial
@@ -71,6 +90,9 @@ export default class Lektor implements Listener<Step> {
    */
   private _originalElementStyling: string = ''
 
+  /**
+   * UI elements
+   */
   private _layout: HTMLElement | null = null
   private _curtain: HTMLElement | null = null
   private _dialog: HTMLElement | null = null
@@ -83,31 +105,71 @@ export default class Lektor implements Listener<Step> {
   private _dialogNextButton: HTMLButtonElement | null = null
   private _dialogEndButton: HTMLButtonElement | null = null
 
-  constructor(params: LektorParams) {
-    params.steps.forEach((step) => {
-      step.setListener(this)
-      this._steps.push(step)
-    })
+  constructor(params?: LektorParams) {
+    params?.steps?.forEach((step) => this.addStep(step))
 
-    this._headerText = params.headerText ?? 'Step: '
-    this._previousButtonText = params.previousButtonText ?? 'Previous'
-    this._nextButtonText = params.nextButtonText ?? 'Next'
-    this._endButtonText = params.endButtonText ?? 'Done!'
-    this._dialogOffset = params.dialogOffset ?? 10
+    this._header = params?.header ?? ''
+    this._previousButtonText = params?.previousButtonText ?? 'Previous'
+    this._nextButtonText = params?.nextButtonText ?? 'Next'
+    this._endButtonText = params?.endButtonText ?? 'Done!'
+    this._dialogOffset = params?.dialogOffset ?? 10
+    this._isKeyboardNavigationEnabled = params?.enableKeyboardNavigation ?? true
 
     this._classPrefix =
-      params.classPrefix === undefined || params.classPrefix === '' ? 'lektor' : params.classPrefix
-    this._zIndex = params.startingZIndex ?? 9990
-    this._onStart = params.onStart ?? null
-    this._onEnd = params.onEnd ?? null
-    this._onClose = params.onClose ?? null
+      params?.classPrefix === undefined || params?.classPrefix === ''
+        ? 'lektor'
+        : params?.classPrefix
+    this._onStart = params?.onStart ?? null
+    this._onEnd = params?.onEnd ?? null
+    this._onStepChange = params?.onStepChange ?? null
+    this._onClose = params?.onClose ?? null
   }
 
   /**
-   *
-   * @param payload
+   * Add step to lektor
    */
-  notify(payload: Step) {
+  public addStep = (step: Step): this => {
+    step.setListener(this)
+    this._steps.push(step)
+    return this
+  }
+
+  /**
+   * Add step after another given step
+   */
+  public addStepAfter = (step: Step): this => {
+    const index = this._steps.indexOf(step)
+    if (index !== -1) {
+      this._steps.splice(index + 1, 0, step)
+    }
+    step.setListener(this)
+    return this
+  }
+
+  /**
+   * Add step after before given step
+   */
+  public addStepBefore = (step: Step): this => {
+    step.setListener(this)
+    this._steps.push(step)
+    return this
+  }
+
+  /**
+   * Remove step to lektor
+   */
+  public removeStep = (step: Step): this => {
+    const index = this._steps.indexOf(step)
+    if (index !== -1) {
+      this._steps.splice(index, 1)
+    }
+    return this
+  }
+
+  /**
+   * Notify listener about step change
+   */
+  public notify(payload: Step) {
     if (payload === this._activeStep) {
       this.resetActiveStep()
       this.renderActiveStep()
@@ -117,7 +179,7 @@ export default class Lektor implements Listener<Step> {
   /**
    * Check if the tutorial is running
    */
-  isActive = (): boolean => {
+  public isActive = (): boolean => {
     return this._activeStep !== null
   }
 
@@ -125,10 +187,21 @@ export default class Lektor implements Listener<Step> {
    * Start the tutorial and mount all lektor elements to DOM
    */
   public start = (): void => {
-    if (!this._steps[0]) {
-      throw new NoStepsException()
+    if (this.isActive()) {
+      return
     }
 
+    this.buildUI()
+    this.enablePreviousStep()
+    this.enableNextStep()
+    this.next()
+    this._onStart?.()
+  }
+
+  /**
+   * Build dialog UI
+   */
+  private buildUI = () => {
     // Create dialog header
     this._dialogHeaderText = this.createDialogHeaderText()
     this._dialogCloseButton = this.createDialogCloseButton()
@@ -157,13 +230,38 @@ export default class Lektor implements Listener<Step> {
     this._layout.appendChild(this._curtain)
     this._layout.appendChild(this._dialog)
 
+    // Append UI to body
     document.body.appendChild(this._layout)
-
-    this.setActiveStep(this._steps[0])
 
     document.addEventListener('scroll', this.moveDialog)
     window.addEventListener('resize', this.moveDialog)
-    this._onStart?.()
+
+    if (this._isKeyboardNavigationEnabled) {
+      window.addEventListener('keydown', this.handleKeyboardNavigation)
+    }
+  }
+
+  /**
+   * Handle keyboard navigation
+   */
+  private handleKeyboardNavigation = (event: KeyboardEvent) => {
+    switch (event.key) {
+      case 'ArrowLeft':
+        this.previous()
+        break
+      case 'ArrowRight':
+        this.next()
+        break
+      case 'Enter':
+        this.next()
+        break
+      case 'Escape':
+        this.end()
+        break
+      default:
+        return
+    }
+    event.preventDefault()
   }
 
   /**
@@ -171,12 +269,14 @@ export default class Lektor implements Listener<Step> {
    */
   private getHookCallbacks = () => {
     return {
-      previousStep: this.previousStep,
-      nextStep: this.nextStep,
-      disablePreviousButton: this.disablePreviousButton,
-      enablePreviousButton: this.enablePreviousButton,
-      disableNextButton: this.disableNextButton,
-      enableNextButton: this.enableNextButton,
+      previous: this.previous,
+      next: this.next,
+      disablePrevious: this.disablePreviousStep,
+      enablePrevious: this.enablePreviousStep,
+      disableNext: this.disableNextStep,
+      enableNext: this.enableNextStep,
+      addStep: this.addStep,
+      removeStep: this.removeStep,
     }
   }
 
@@ -188,13 +288,19 @@ export default class Lektor implements Listener<Step> {
     this._activeStep = step
     this.renderActiveStep()
     this._activeStep.onMounted?.(step.element, this.getHookCallbacks())
+    this._onStepChange?.()
   }
 
   /**
    * Render active step and dialog
    */
   private renderActiveStep = (): void => {
-    if (this._activeStep?.element) {
+    if (!this._activeStep) {
+      return
+    }
+    this._dialog?.classList.remove(this.buildClassName('dialog'))
+
+    if (this._activeStep.element) {
       this._originalElementStyling = this._activeStep.element.style.cssText
 
       if (['', 'static'].includes(this._activeStep.element.style.position)) {
@@ -205,7 +311,7 @@ export default class Lektor implements Listener<Step> {
     }
 
     if (this._activeStep?.element && !this.isElementFullyVisible(this._activeStep.element)) {
-      this._activeStep.element.scrollIntoView({
+      this._activeStep.element?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
         inline: 'nearest',
@@ -215,7 +321,20 @@ export default class Lektor implements Listener<Step> {
     this.setDialogHeaderText()
     this.setDialogBody()
     this.setDialogButtons()
+    this._dialog?.classList.add(this.buildClassName('dialog'))
     this.moveDialog()
+  }
+
+  /**
+   * Reset steps styling to it's original state
+   */
+  private resetActiveStep = (): void => {
+    if (this._activeStep?.element) {
+      this._activeStep.element.style.cssText = this._originalElementStyling || ''
+      this._activeStep.element.classList.remove(this.buildClassName('active-element'))
+    }
+
+    this._activeStep?.onUnmounted?.(this._activeStep.element, this.getHookCallbacks())
   }
 
   /**
@@ -231,6 +350,16 @@ export default class Lektor implements Listener<Step> {
     const activeElementRect = this._activeStep.element?.getBoundingClientRect()
     const dialogRect = this._dialog.getBoundingClientRect()
     if (!activeElementRect) {
+      console.log(
+        'bez elementu ' +
+          window.innerHeight +
+          ' / ' +
+          dialogRect.height +
+          ' ' +
+          window.innerWidth +
+          ' / ' +
+          dialogRect.width,
+      )
       top = Math.round(window.innerHeight / 2 - dialogRect.height / 2)
       left = Math.round(window.innerWidth / 2 - dialogRect.width / 2)
     } else {
@@ -310,45 +439,43 @@ export default class Lektor implements Listener<Step> {
    * Set header text
    */
   private setDialogHeaderText = () => {
-    if (!this._dialogHeaderText || !this._activeStep) {
-      return
+    if (this._dialogHeaderText && this._activeStep) {
+      this._dialogHeaderText.innerHTML = this._activeStep.header ?? this._header
     }
-
-    const index = this._steps.indexOf(this._activeStep)
-    if (index == -1) {
-      return
-    }
-
-    this._dialogHeaderText.innerText = `${this._headerText} ${index + 1} / ${this._steps.length}`
   }
 
+  /**
+   * Set dialog body
+   */
   private setDialogBody = () => {
-    this._dialogBody!.innerHTML = this._activeStep?.body ?? ''
+    if (this._dialogBody && this._activeStep) {
+      this._dialogBody.innerHTML = this._activeStep.body ?? ''
+    }
   }
 
   /**
    * Set text for dialog buttons
    */
   private setDialogButtons = () => {
-    if (this.getPreviousStep() === null) {
-      this.disablePreviousButton()
+    if (this.getPreviousStep()) {
+      this.enablePreviousStep()
     } else {
-      this.enablePreviousButton()
+      this.disablePreviousStep()
     }
 
-    if (this.getNextStep() === null) {
-      this._dialogNextButton!.style.display = 'none'
-      this._dialogEndButton!.style.removeProperty('display')
-    } else {
+    if (this.getNextStep()) {
       this._dialogNextButton!.style.removeProperty('display')
       this._dialogEndButton!.style.display = 'none'
+    } else {
+      this._dialogNextButton!.style.display = 'none'
+      this._dialogEndButton!.style.removeProperty('display')
     }
   }
 
   /**
    * End tutorial
    */
-  end = () => {
+  public end = () => {
     this.destroy()
     this._onEnd?.()
   }
@@ -356,7 +483,7 @@ export default class Lektor implements Listener<Step> {
   /**
    * Close tutorial
    */
-  close = (): void => {
+  public close = (): void => {
     this.destroy()
     this._onClose?.()
   }
@@ -364,12 +491,15 @@ export default class Lektor implements Listener<Step> {
   private destroy = (): void => {
     this.resetActiveStep()
     this._activeStep = null
-    this._dialogPreviousButton?.removeEventListener('click', this.previousStep)
-    this._dialogNextButton?.removeEventListener('click', this.nextStep)
+    this._dialogPreviousButton?.removeEventListener('click', this.previous)
+    this._dialogNextButton?.removeEventListener('click', this.next)
     this._dialogCloseButton?.removeEventListener('click', this.close)
     this._dialogEndButton?.removeEventListener('click', this.end)
     document.removeEventListener('scroll', this.renderActiveStep)
     window.removeEventListener('resize', this.renderActiveStep)
+    if (this._isKeyboardNavigationEnabled) {
+      window.removeEventListener('keydown', this.handleKeyboardNavigation)
+    }
     this._layout?.remove()
     this._layout = null
   }
@@ -377,103 +507,114 @@ export default class Lektor implements Listener<Step> {
   /**
    * Go to previous step
    */
-  previousStep = () => {
-    const previousStep = this.getPreviousStep()
-    if (previousStep === null) {
-      return
+  public previous = (): Lektor => {
+    if (this._isPreviousStepEnabled) {
+      const previousStep = this.getPreviousStep()
+      if (previousStep) {
+        this.setActiveStep(previousStep)
+      }
     }
 
-    this.setActiveStep(previousStep)
+    return this
   }
 
   /**
    * Get previous step if there is any
    */
   private getPreviousStep = (): Step | null => {
+    if (this._steps.length === 0) {
+      return null
+    }
+
+    let previousStep: Step | null = null
     if (!this._activeStep) {
-      return null
+      previousStep = this._steps[0]
+    } else {
+      const index = this._steps.indexOf(this._activeStep)
+      if (index !== -1 && this._steps[index - 1]) {
+        previousStep = this._steps[index - 1]
+      }
     }
 
-    const index = this._steps.indexOf(this._activeStep)
-    if (index === -1) {
-      return null
+    return previousStep
+  }
+
+  /**
+   * Disable previous step
+   */
+  public disablePreviousStep = (): Lektor => {
+    this._isPreviousStepEnabled = false
+    if (this._dialogPreviousButton) {
+      this._dialogPreviousButton.disabled = true
+    }
+    return this
+  }
+
+  /**
+   * Enable previous step
+   */
+  public enablePreviousStep = (): Lektor => {
+    this._isPreviousStepEnabled = true
+    if (this._dialogPreviousButton) {
+      this._dialogPreviousButton.disabled = false
     }
 
-    const previousStep = this._steps[index - 1]
-    return previousStep === undefined ? null : previousStep
+    return this
   }
 
   /**
    * Go to next step
    */
-  nextStep = () => {
-    const nextStep = this.getNextStep()
-    if (nextStep === null) {
-      return
+  public next = (): Lektor => {
+    if (this._isNextStepEnabled) {
+      const nextStep = this.getNextStep()
+      if (nextStep) {
+        this.setActiveStep(nextStep)
+      } else {
+        this.end()
+      }
     }
 
-    this.setActiveStep(nextStep)
+    return this
   }
 
   /**
    * Get next step if there is any
    */
   private getNextStep = (): Step | null => {
-    if (!this._activeStep) {
+    if (this._steps.length === 0) {
       return null
     }
 
-    const index = this._steps.indexOf(this._activeStep)
-    if (index === -1) {
-      return null
-    }
-
-    const nextStep = this._steps[index + 1]
-    return nextStep === undefined ? null : nextStep
-  }
-
-  /**
-   * Reset steps styling to it's original state
-   */
-  private resetActiveStep = (): void => {
+    let nextStep: Step | null = null
     if (!this._activeStep) {
-      return
+      nextStep = this._steps[0]
+    } else {
+      const index = this._steps.indexOf(this._activeStep)
+      if (index !== -1 && this._steps[index + 1]) {
+        nextStep = this._steps[index + 1]
+      }
     }
 
-    if (this._activeStep.element) {
-      this._activeStep.element.style.cssText = this._originalElementStyling || ''
-      this._activeStep.element.classList.remove(this.buildClassName('active-element'))
-    }
-
-    this._activeStep.onUnmounted?.(this._activeStep.element, this.getHookCallbacks())
+    return nextStep
   }
 
   /**
-   * Disable next button
+   * Disable next step
    */
-  disableNextButton = () => {
+  public disableNextStep = (): Lektor => {
+    this._isNextStepEnabled = false
     this._dialogNextButton!.disabled = true
+    return this
   }
 
   /**
-   * Enable next button
+   * Enable next step
    */
-  enableNextButton = () => {
+  public enableNextStep = (): Lektor => {
+    this._isNextStepEnabled = true
     this._dialogNextButton!.disabled = false
-  }
-
-  /**
-   * Disable previous button
-   */
-  disablePreviousButton = () => {
-    this._dialogPreviousButton!.disabled = true
-  }
-
-  /**
-   * Enable previous button
-   */
-  enablePreviousButton = () => {
-    this._dialogPreviousButton!.disabled = false
+    return this
   }
 
   /**
@@ -512,7 +653,7 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial dialog
    */
   private createDialog = (): HTMLElement => {
-    const dialog = document.createElement('div')
+    const dialog = document.createElement('dialog')
     dialog.style.display = 'flex'
     dialog.style.position = 'absolute'
     dialog.style.top = '0'
@@ -576,7 +717,7 @@ export default class Lektor implements Listener<Step> {
     const previousButton = document.createElement('button')
     previousButton.innerText = this._previousButtonText
     previousButton.classList.add(this.buildClassName('previous-button'))
-    previousButton.addEventListener('click', this.previousStep)
+    previousButton.addEventListener('click', this.previous)
     return previousButton
   }
 
@@ -587,7 +728,7 @@ export default class Lektor implements Listener<Step> {
     const nextButton = document.createElement('button')
     nextButton.innerText = this._nextButtonText
     nextButton.classList.add(this.buildClassName('next-button'))
-    nextButton.addEventListener('click', this.nextStep)
+    nextButton.addEventListener('click', this.next)
     return nextButton
   }
 
