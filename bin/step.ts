@@ -1,8 +1,8 @@
 import { Position } from './enums/Position.js'
+import type { LektorCallbacks } from './interfaces/LektorCallbacks.js'
 import type Listener from './interfaces/Listener.js'
 import type Notifier from './interfaces/Notifier.js'
 import type StepParams from './interfaces/StepParams.js'
-import type { StepMountHook, StepUnmountHook } from './types/StepHooks.js'
 
 export class Step implements Notifier {
   private _element: HTMLElement | null = null
@@ -10,8 +10,8 @@ export class Step implements Notifier {
   private _header: string | null = null
   private _listeners: Listener<Step>[] = []
   private _dialogPosition: Position
-  private _onMounted: StepMountHook | null = null
-  private _onUnmounted: StepUnmountHook | null = null
+  private _onMounted: ((step: Step | null, callbacks: LektorCallbacks) => void) | null = null
+  private _onUnmounted: ((step: Step | null, callbacks: LektorCallbacks) => void) | null = null
 
   constructor(params: StepParams) {
     this._element = params.element ?? null
@@ -56,11 +56,11 @@ export class Step implements Notifier {
     return this._dialogPosition
   }
 
-  get onMounted(): StepMountHook | null {
+  get onMounted(): ((step: Step | null, callbacks: LektorCallbacks) => void) | null {
     return this._onMounted
   }
 
-  get onUnmounted(): StepUnmountHook | null {
+  get onUnmounted(): ((step: Step | null, callbacks: LektorCallbacks) => void) | null {
     return this._onUnmounted
   }
 

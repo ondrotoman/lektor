@@ -287,7 +287,7 @@ export default class Lektor implements Listener<Step> {
     this.resetActiveStep()
     this._activeStep = step
     this.renderActiveStep()
-    this._activeStep.onMounted?.(step.element, this.getHookCallbacks())
+    this._activeStep.onMounted?.(step, this.getHookCallbacks())
     this._onStepChange?.()
   }
 
@@ -334,7 +334,7 @@ export default class Lektor implements Listener<Step> {
       this._activeStep.element.classList.remove(this.buildClassName('active-element'))
     }
 
-    this._activeStep?.onUnmounted?.(this._activeStep.element, this.getHookCallbacks())
+    this._activeStep?.onUnmounted?.(this._activeStep, this.getHookCallbacks())
   }
 
   /**
@@ -350,16 +350,6 @@ export default class Lektor implements Listener<Step> {
     const activeElementRect = this._activeStep.element?.getBoundingClientRect()
     const dialogRect = this._dialog.getBoundingClientRect()
     if (!activeElementRect) {
-      console.log(
-        'bez elementu ' +
-          window.innerHeight +
-          ' / ' +
-          dialogRect.height +
-          ' ' +
-          window.innerWidth +
-          ' / ' +
-          dialogRect.width,
-      )
       top = Math.round(window.innerHeight / 2 - dialogRect.height / 2)
       left = Math.round(window.innerWidth / 2 - dialogRect.width / 2)
     } else {

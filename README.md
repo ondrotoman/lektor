@@ -28,21 +28,28 @@ yarn add @ondrotoman/lektor
 
 # ⚠️ Security Notice
 
-> **Be careful with `header` content.**
+> **Be careful with `body` and `header` content.**
 
-`Lektor` and `Step` headers can contain **HTML**, not just plain text.
+`Lektor` and `Step` body and headers can contain **HTML**, not just plain text.
 
 If you use **user-provided or untrusted content**, unsanitized HTML can introduce **XSS vulnerabilities**.
 
 ### 🔒 Recommendation
 
-**Never pass untrusted content directly into `header`.**
+**Never pass untrusted content directly into `body` and `header`.**
 
 If HTML is required, make sure it is **properly sanitized** first.
 
 ```ts
+new Lektor({
+  header: safeContent,
+})
+```
+
+```ts
 new Step({
   header: safeContent,
+  body: safeContent,
 })
 ```
 
@@ -137,27 +144,27 @@ new Step({
   element: document.getElementById('input'),
   body: 'Type whatever you want right here',
 
-  onMounted: (element: HTMLElement | null, callbacks: LektorCallbacks) => {
-    if (!validateInput(input.value)) {
+  onMounted: (step: Step | null, callbacks: LektorCallbacks) => {
+    if (!validateInput(step.element.value)) {
       callbacks.disableNext()
     }
 
     keyupHandler = () => {
-      if (validateInput(input.value)) {
+      if (validateInput(step.element.value)) {
         callbacks.enableNext()
       } else {
         callbacks.disableNext()
       }
     }
 
-    input.addEventListener('keyup', keyupHandler)
-    input.focus()
+    step.element.addEventListener('keyup', keyupHandler)
+    step.element.focus()
   },
 
-  onUnmounted: (element: HTMLElement | null, callbacks: LektorCallbacks) => {
+  onUnmounted: (step: Step | null, callbacks: LektorCallbacks) => {
     if (keyupHandler) {
       callbacks.enableNext()
-      input.removeEventListener('keyup', keyupHandler)
+      step.element.removeEventListener('keyup', keyupHandler)
     }
   },
 })
@@ -237,23 +244,17 @@ interface StepParams {
   element?: HTMLElement | null
   header?: string
   dialogPosition?: Position
-  onMounted?: StepMountHook | null
-  onUnmounted?: StepUnmountHook | null
+  onMounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
+  onUnmounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
 }
 ```
 
 ### Hooks
 
 ```ts
-onMounted: <T extends HTMLElement>(
-  element: T | null,
-  callbacks: LektorCallbacks,
-) => void
+onMounted: (step: Step | null, callbacks: LektorCallbacks) => void
 
-onUnmounted: <T extends HTMLElement>(
-  element: T | null,
-  callbacks: LektorCallbacks,
-) => void
+onUnmounted: (step: Step | null, callbacks: LektorCallbacks) => void
 ```
 
 ### Lektor callbacks
