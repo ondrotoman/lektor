@@ -13,5 +13,7 @@
     "rootDir": "./bin",
     "allowImportingTsExtensions": false,
     "noEmit": false
-  }
+  },
+  "include": ["bin/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
 }
