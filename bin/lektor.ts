@@ -8,7 +8,7 @@ export default class Lektor implements Listener<Step> {
   /**
    * Starting Z-index
    */
-  private readonly _zIndex: number = 99990
+  private readonly _zIndex: number = 9990
 
   /**
    * Tutorial steps
@@ -96,8 +96,9 @@ export default class Lektor implements Listener<Step> {
   private _layout: HTMLElement | null = null
   private _curtain: HTMLElement | null = null
   private _dialog: HTMLElement | null = null
+  private _dialogArrow: HTMLElement | null = null
   private _dialogHeader: HTMLElement | null = null
-  private _dialogHeaderText: HTMLElement | null = null
+  private _dialogHeaderContent: HTMLElement | null = null
   private _dialogBody: HTMLElement | null = null
   private _dialogFooter: HTMLElement | null = null
   private _dialogCloseButton: HTMLButtonElement | null = null
@@ -203,10 +204,10 @@ export default class Lektor implements Listener<Step> {
    */
   private buildUI = () => {
     // Create dialog header
-    this._dialogHeaderText = this.createDialogHeaderText()
+    this._dialogHeaderContent = this.createDialogHeadeContent()
     this._dialogCloseButton = this.createDialogCloseButton()
     this._dialogHeader = this.createDialogHeader()
-    this._dialogHeader.appendChild(this._dialogHeaderText)
+    this._dialogHeader.appendChild(this._dialogHeaderContent)
     this._dialogHeader.appendChild(this._dialogCloseButton)
     // Create dialog footer
     this._dialogPreviousButton = this.createDialogPreviousButton()
@@ -218,8 +219,11 @@ export default class Lektor implements Listener<Step> {
     this._dialogFooter.appendChild(this._dialogEndButton)
     // Create dialog body
     this._dialogBody = this.createDialogBody()
+    // Create dialog arrow
+    this._dialogArrow = this.createDialogArrow()
     // Create dialog
     this._dialog = this.createDialog()
+    this._dialog.appendChild(this._dialogArrow)
     this._dialog.appendChild(this._dialogHeader)
     this._dialog.appendChild(this._dialogBody)
     this._dialog.appendChild(this._dialogFooter)
@@ -286,9 +290,25 @@ export default class Lektor implements Listener<Step> {
   private setActiveStep = (step: Step) => {
     this.resetActiveStep()
     this._activeStep = step
+    this.beforeStepActivation()
     this.renderActiveStep()
+    this.afterStepActivation()
     this._activeStep.onMounted?.(step, this.getHookCallbacks())
     this._onStepChange?.()
+  }
+
+  /**
+   * Do all the things before step activation
+   */
+  private beforeStepActivation = () => {
+    this._dialog?.classList.remove(this.buildClassName('dialog-active'))
+  }
+
+  /**
+   * Do all the things after step activation
+   */
+  private afterStepActivation = () => {
+    this._dialog?.classList.add(this.buildClassName('dialog-active'))
   }
 
   /**
@@ -298,7 +318,6 @@ export default class Lektor implements Listener<Step> {
     if (!this._activeStep) {
       return
     }
-    this._dialog?.classList.remove(this.buildClassName('dialog'))
 
     if (this._activeStep.element) {
       this._originalElementStyling = this._activeStep.element.style.cssText
@@ -318,10 +337,10 @@ export default class Lektor implements Listener<Step> {
       })
     }
 
-    this.setDialogHeaderText()
+    this.setDialogHeaderContent()
     this.setDialogBody()
     this.setDialogButtons()
-    this._dialog?.classList.add(this.buildClassName('dialog'))
+
     this.moveDialog()
   }
 
@@ -426,11 +445,11 @@ export default class Lektor implements Listener<Step> {
   }
 
   /**
-   * Set header text
+   * Set header content
    */
-  private setDialogHeaderText = () => {
-    if (this._dialogHeaderText && this._activeStep) {
-      this._dialogHeaderText.innerHTML = this._activeStep.header ?? this._header
+  private setDialogHeaderContent = () => {
+    if (this._dialogHeaderContent && this._activeStep) {
+      this._dialogHeaderContent.innerHTML = this._activeStep.header ?? this._header
     }
   }
 
@@ -447,9 +466,25 @@ export default class Lektor implements Listener<Step> {
    * Set text for dialog buttons
    */
   private setDialogButtons = () => {
+    if (this._dialogPreviousButton) {
+      this._dialogPreviousButton.innerText =
+        this._activeStep?.previousButtonText ?? this._previousButtonText
+    }
+
+    if (this._dialogNextButton) {
+      this._dialogNextButton.innerText = this._activeStep?.nextButtonText ?? this._nextButtonText
+    }
+
+    if (this._dialogPreviousButton) {
+      this._dialogPreviousButton.innerText =
+        this._activeStep?.previousButtonText ?? this._previousButtonText
+    }
+
     if (this.getPreviousStep()) {
+      this._dialogPreviousButton!.style.removeProperty('display')
       this.enablePreviousStep()
     } else {
+      this._dialogPreviousButton!.style.display = 'none'
       this.disablePreviousStep()
     }
 
@@ -478,6 +513,9 @@ export default class Lektor implements Listener<Step> {
     this._onClose?.()
   }
 
+  /**
+   * Destroy Lektor
+   */
   private destroy = (): void => {
     this.resetActiveStep()
     this._activeStep = null
@@ -618,8 +656,10 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial layout element
    */
   private createLayout = (): HTMLElement => {
+    const name = 'layout'
     const layout = document.createElement('div')
-    layout.classList.add(this.buildClassName('layout'))
+    layout.dataset.lektor = name
+    layout.classList.add(this.buildClassName(name))
     return layout
   }
 
@@ -627,7 +667,9 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial layout element
    */
   private createCurtain = (): HTMLElement => {
+    const name = 'curtain'
     const curtain = document.createElement('div')
+    curtain.dataset.lektor = name
     curtain.style.display = 'block'
     curtain.style.position = 'fixed'
     curtain.style.top = '0'
@@ -635,7 +677,7 @@ export default class Lektor implements Listener<Step> {
     curtain.style.left = '0'
     curtain.style.right = '0'
     curtain.style.zIndex = String(Number(this._zIndex) + 1)
-    curtain.classList.add(this.buildClassName('curtain'))
+    curtain.classList.add(this.buildClassName(name))
     return curtain
   }
 
@@ -643,40 +685,64 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial dialog
    */
   private createDialog = (): HTMLElement => {
+    const name = 'dialog'
     const dialog = document.createElement('dialog')
+    dialog.dataset.lektor = name
     dialog.style.display = 'flex'
     dialog.style.position = 'absolute'
     dialog.style.top = '0'
     dialog.style.left = '0'
     dialog.style.zIndex = String(Number(this._zIndex) + 3)
-    dialog.classList.add(this.buildClassName('dialog'))
+    dialog.classList.add(this.buildClassName(name))
+
     return dialog
+  }
+
+  /**
+   * Create dialog to element arrow
+   */
+  private createDialogArrow = (): HTMLElement => {
+    const name = 'arrow'
+    const arrow = document.createElement('div')
+    arrow.dataset.lektor = name
+    arrow.style.position = 'absolute'
+    arrow.style.top = '0'
+    arrow.style.left = '0'
+    arrow.style.zIndex = String(Number(this._zIndex) + 5)
+    arrow.classList.add(this.buildClassName(name))
+    return arrow
   }
 
   /**
    * Create tutorial dialog header
    */
   private createDialogHeader = (): HTMLElement => {
+    const name = 'header'
     const header = document.createElement('header')
-    header.classList.add(this.buildClassName('header'))
+    header.dataset.lektor = name
+    header.classList.add(this.buildClassName(name))
     return header
   }
 
   /**
-   * Create tutorial dialog header text
+   * Create tutorial dialog header content
    */
-  private createDialogHeaderText = (): HTMLElement => {
-    const headerText = document.createElement('h1')
-    headerText.classList.add(this.buildClassName('text'))
-    return headerText
+  private createDialogHeadeContent = (): HTMLElement => {
+    const name = 'header-content'
+    const headerContent = document.createElement('div')
+    headerContent.dataset.lektor = name
+    headerContent.classList.add(this.buildClassName(name))
+    return headerContent
   }
 
   /**
    * Create tutorial dialog clsoe button
    */
   private createDialogCloseButton(): HTMLButtonElement {
+    const name = 'close-button'
     const closeButton = document.createElement('button')
-    closeButton.classList.add(this.buildClassName('close-button'))
+    closeButton.dataset.lektor = name
+    closeButton.classList.add(this.buildClassName(name))
     closeButton.innerText = '✕'
     closeButton.addEventListener('click', this.close)
     return closeButton
@@ -686,8 +752,10 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial dialog body
    */
   private createDialogBody = (): HTMLElement => {
+    const name = 'body'
     const body = document.createElement('main')
-    body.classList.add(this.buildClassName('body'))
+    body.dataset.lektor = name
+    body.classList.add(this.buildClassName(name))
     return body
   }
 
@@ -695,18 +763,22 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial dialog footer
    */
   private createDialogFooter = (): HTMLElement => {
-    const body = document.createElement('footer')
-    body.classList.add(this.buildClassName('footer'))
-    return body
+    const name = 'footer'
+    const footer = document.createElement('footer')
+    footer.dataset.lektor = name
+    footer.classList.add(this.buildClassName(name))
+    return footer
   }
 
   /**
    * Create dialog previous button
    */
   private createDialogPreviousButton = (): HTMLButtonElement => {
+    const name = 'previous-button'
     const previousButton = document.createElement('button')
+    previousButton.dataset.lektor = name
     previousButton.innerText = this._previousButtonText
-    previousButton.classList.add(this.buildClassName('previous-button'))
+    previousButton.classList.add(this.buildClassName(name))
     previousButton.addEventListener('click', this.previous)
     return previousButton
   }
@@ -715,9 +787,11 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial next button
    */
   private createDialogNextButton = (): HTMLButtonElement => {
+    const name = 'next-button'
     const nextButton = document.createElement('button')
+    nextButton.dataset.lektor = name
     nextButton.innerText = this._nextButtonText
-    nextButton.classList.add(this.buildClassName('next-button'))
+    nextButton.classList.add(this.buildClassName(name))
     nextButton.addEventListener('click', this.next)
     return nextButton
   }
@@ -726,7 +800,9 @@ export default class Lektor implements Listener<Step> {
    * Create tutorial end button
    */
   private createDialogEndButton = (): HTMLButtonElement => {
+    const name = 'end-button'
     const endButton = document.createElement('button')
+    endButton.dataset.lektor = name
     endButton.innerText = this._endButtonText
     endButton.classList.add(this.buildClassName('end-button'))
     endButton.addEventListener('click', this.end)

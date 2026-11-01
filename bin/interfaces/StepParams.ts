@@ -6,6 +6,9 @@ export default interface StepParams {
   body: string
   element?: HTMLElement | null
   header?: string
+  previousButtonText?: string
+  nextButtonText?: string
+  endButtonText?: string
   dialogPosition?: Position
   onMounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
   onUnmounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null

@@ -10,7 +10,7 @@ export interface LektorParams {
   endButtonText?: string
   classPrefix?: string
   dialogOffset?: number
-  dialogPositon?: Position
+  dialogPosition?: Position
   enableKeyboardNavigation?: boolean
   onStart?: Callable
   onEnd?: Callable

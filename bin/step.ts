@@ -5,10 +5,13 @@ import type Notifier from './interfaces/Notifier.js'
 import type StepParams from './interfaces/StepParams.js'
 
 export class Step implements Notifier {
+  private _listeners: Listener<Step>[] = []
   private _element: HTMLElement | null = null
   private _body: string = ''
   private _header: string | null = null
-  private _listeners: Listener<Step>[] = []
+  private _previousButtonText: string | null = null
+  private _nextButtonText: string | null = null
+  private _endButtonText: string | null = null
   private _dialogPosition: Position
   private _onMounted: ((step: Step | null, callbacks: LektorCallbacks) => void) | null = null
   private _onUnmounted: ((step: Step | null, callbacks: LektorCallbacks) => void) | null = null
@@ -17,6 +20,9 @@ export class Step implements Notifier {
     this._element = params.element ?? null
     this._body = params.body
     this._header = params.header ?? null
+    this._previousButtonText = params.previousButtonText ?? null
+    this._nextButtonText = params.nextButtonText ?? null
+    this._endButtonText = params.endButtonText ?? null
     this._dialogPosition = params.dialogPosition ?? Position.BOTTOM
     this._onMounted = params.onMounted ?? null
     this._onUnmounted = params.onUnmounted ?? null
@@ -48,6 +54,36 @@ export class Step implements Notifier {
 
   setHeader(header: string | null): this {
     this._header = header
+    this.notifyListeners()
+    return this
+  }
+
+  get previousButtonText(): string | null {
+    return this._previousButtonText
+  }
+
+  setPreviousButtonText(text: string | null): this {
+    this._previousButtonText = text
+    this.notifyListeners()
+    return this
+  }
+
+  get nextButtonText(): string | null {
+    return this._nextButtonText
+  }
+
+  setNextButtonText(text: string | null): this {
+    this._nextButtonText = text
+    this.notifyListeners()
+    return this
+  }
+
+  get endButtonText(): string | null {
+    return this._endButtonText
+  }
+
+  setEndButtonText(text: string | null): this {
+    this._endButtonText = text
     this.notifyListeners()
     return this
   }

@@ -172,6 +172,11 @@ new Step({
 
 When the step is mounted, the **Next** action remains disabled until the input contains at least one character. The event listener is removed when the step is unmounted.
 
+## Keyboard navigation
+
+By default you can use `Arrow Left` to navigate to previous step, `Enter` and `Arrow Right` to go to next step and `Escape` for closing Lektor.
+Keyboard navigation can be disabled as part of `LektorParams`
+
 # API
 
 ## Lektor
