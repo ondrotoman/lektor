@@ -153,7 +153,19 @@ const siteTour = new Lektor({
 })
 ```
 
-If the dialog does not fit in the preferred position, Lektor picks the first position where it fits.
+The dialog always stays on the visible screen:
+
+1. If it does not fit in the preferred position, Lektor tries the opposite side, then the remaining sides, starting with the one with more space.
+2. When the element is close to a screen edge, the dialog is shifted along the element so it does not overflow (e.g. a bottom dialog next to the right edge moves left).
+3. If it fits nowhere around the element, it is placed on the side with the most space and kept inside the screen, even if it partially covers the element.
+
+The chosen side is exposed as `data-position` (`top`, `bottom`, `left` or `right`) on the dialog, which you can use for styling, e.g. an arrow:
+
+```css
+.lektor-dialog[data-position='bottom'] .lektor-arrow {
+  /* arrow pointing up to the element */
+}
+```
 
 ### Start the tour
 

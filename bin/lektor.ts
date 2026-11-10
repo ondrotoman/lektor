@@ -439,70 +439,112 @@ export default class Lektor implements Listener<Step> {
       return
     }
 
-    let top = 0
-    let left = 0
-    const activeElementRect = this._activeStep.element?.getBoundingClientRect()
+    // Measure dialog at its natural size, not squeezed by its previous position
+    this._dialog.style.top = '0'
+    this._dialog.style.left = '0'
     const dialogRect = this._dialog.getBoundingClientRect()
-    if (!activeElementRect) {
-      top = Math.round(window.scrollY + window.innerHeight / 2 - dialogRect.height / 2)
-      left = Math.round(window.scrollX + window.innerWidth / 2 - dialogRect.width / 2)
-    } else {
-      const preferredPosition = this._activeStep.dialogPosition ?? this._dialogPosition
-      let position: Position = preferredPosition
-      if (!this.canDialogFit(preferredPosition)) {
-        position = Object.values(Position).find((p) => this.canDialogFit(p)) ?? preferredPosition
-      }
+    const viewport = this.getViewportSize()
 
-      const relativeTop = activeElementRect.top + window.scrollY
-      const relativeLeft = activeElementRect.left + window.scrollX
-      if (position == Position.TOP) {
-        top = relativeTop - (dialogRect.height + this._dialogOffset)
-        left = relativeLeft
-      } else if (position == Position.BOTTOM) {
-        top = relativeTop + activeElementRect.height + this._dialogOffset
-        left = relativeLeft
-      } else if (position == Position.LEFT) {
-        left = relativeLeft - dialogRect.width - this._dialogOffset
-        top = relativeTop
-      } else if (position == Position.RIGHT) {
-        top = relativeTop
-        left = relativeLeft + activeElementRect.width + this._dialogOffset
-      }
+    let top: number
+    let left: number
+    if (!this._activeStep.element) {
+      top = (viewport.height - dialogRect.height) / 2
+      left = (viewport.width - dialogRect.width) / 2
+      delete this._dialog.dataset.position
+    } else {
+      const elementRect = this._activeStep.element.getBoundingClientRect()
+      const position = this.getDialogPosition(elementRect, dialogRect, viewport)
+      const coordinates = this.getDialogCoordinates(position, elementRect, dialogRect)
+      top = coordinates.top
+      left = coordinates.left
+      this._dialog.dataset.position = position
     }
 
-    this._dialog.style.top = top + 'px'
-    this._dialog.style.left = left + 'px'
+    // Keep dialog inside the visible screen
+    const offset = this._dialogOffset
+    top = this.clamp(top, offset, viewport.height - dialogRect.height - offset)
+    left = this.clamp(left, offset, viewport.width - dialogRect.width - offset)
+
+    this._dialog.style.top = Math.round(top + window.scrollY) + 'px'
+    this._dialog.style.left = Math.round(left + window.scrollX) + 'px'
   }
 
   /**
-   * Check if dialog fits around the element
+   * Get visible screen size without scrollbars
    */
-  private canDialogFit = (position: Position): boolean => {
-    if (!this._dialog || !this._activeStep?.element) {
-      return false
+  private getViewportSize = (): { width: number; height: number } => {
+    return {
+      width: document.documentElement.clientWidth || window.innerWidth,
+      height: document.documentElement.clientHeight || window.innerHeight,
+    }
+  }
+
+  /**
+   * Pick dialog position around the element, starting with the preferred one,
+   * then the opposite side and then the remaining sides with more space first
+   */
+  private getDialogPosition = (
+    elementRect: DOMRect,
+    dialogRect: DOMRect,
+    viewport: { width: number; height: number },
+  ): Position => {
+    const offset = this._dialogOffset
+    const preferred = this._activeStep?.dialogPosition ?? this._dialogPosition
+
+    // Space left around the element after the dialog and offsets are placed
+    const spaceLeft: Record<Position, number> = {
+      [Position.TOP]: elementRect.top - dialogRect.height - offset * 2,
+      [Position.BOTTOM]: viewport.height - elementRect.bottom - dialogRect.height - offset * 2,
+      [Position.LEFT]: elementRect.left - dialogRect.width - offset * 2,
+      [Position.RIGHT]: viewport.width - elementRect.right - dialogRect.width - offset * 2,
     }
 
-    const activeElementRect = this._activeStep.element.getBoundingClientRect()
-    const dialogRect = this._dialog.getBoundingClientRect()
-    const canFitAbove = activeElementRect.top - (dialogRect.height + this._dialogOffset) >= 0
-    const canFitBelow =
-      window.innerHeight > activeElementRect.bottom + (dialogRect.height + this._dialogOffset)
-    const canFitLeft = activeElementRect.left - (dialogRect.width + this._dialogOffset) >= 0
-    const canFitRight =
-      window.innerWidth > activeElementRect.right + (dialogRect.width + this._dialogOffset)
+    const opposite: Record<Position, Position> = {
+      [Position.TOP]: Position.BOTTOM,
+      [Position.BOTTOM]: Position.TOP,
+      [Position.LEFT]: Position.RIGHT,
+      [Position.RIGHT]: Position.LEFT,
+    }
 
+    const remaining = Object.values(Position)
+      .filter((p) => p !== preferred && p !== opposite[preferred])
+      .sort((a, b) => spaceLeft[b] - spaceLeft[a])
+    const candidates = [preferred, opposite[preferred], ...remaining]
+
+    // Fall back to the side with the most space, the dialog is clamped to the screen anyway
+    return (
+      candidates.find((p) => spaceLeft[p] >= 0) ??
+      candidates.reduce((best, p) => (spaceLeft[p] > spaceLeft[best] ? p : best))
+    )
+  }
+
+  /**
+   * Get dialog coordinates next to the element in given position
+   */
+  private getDialogCoordinates = (
+    position: Position,
+    elementRect: DOMRect,
+    dialogRect: DOMRect,
+  ): { top: number; left: number } => {
+    const offset = this._dialogOffset
     switch (position) {
       case Position.TOP:
-        return canFitAbove
-      case Position.BOTTOM:
-        return canFitBelow
+        return { top: elementRect.top - dialogRect.height - offset, left: elementRect.left }
       case Position.LEFT:
-        return canFitLeft
+        return { top: elementRect.top, left: elementRect.left - dialogRect.width - offset }
       case Position.RIGHT:
-        return canFitRight
+        return { top: elementRect.top, left: elementRect.right + offset }
+      case Position.BOTTOM:
       default:
-        return false
+        return { top: elementRect.bottom + offset, left: elementRect.left }
     }
+  }
+
+  /**
+   * Clamp value between min and max, preferring min when the range is empty
+   */
+  private clamp = (value: number, min: number, max: number): number => {
+    return Math.max(min, Math.min(value, max))
   }
 
   /**

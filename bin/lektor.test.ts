@@ -91,7 +91,7 @@ describe('Lektor', () => {
 
     const dialog = document.querySelector('[data-lektor="dialog"]') as HTMLElement
     expect(dialog.style.left).toBe('10px')
-    expect(dialog.style.top).toBe('0px')
+    expect(dialog.style.top).toBe('10px')
     lektor.close()
   })
 
@@ -168,5 +168,77 @@ describe('Lektor', () => {
 
     lektor.enableNextStep().next()
     expect(getButton('next-button').disabled).toBe(false)
+  })
+})
+
+describe('Lektor dialog positioning', () => {
+  // jsdom viewport is 1024x768, dialog is 300x200 with default 10px offset
+  const rect = (x: number, y: number, width: number, height: number): DOMRect =>
+    ({ x, y, top: y, left: x, width, height, right: x + width, bottom: y + height }) as DOMRect
+
+  const startWithElementAt = (elementRect: DOMRect, dialogPosition: Position): HTMLElement => {
+    const element = createElement()
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this === element) {
+        return elementRect
+      }
+      return this.dataset.lektor === 'dialog' ? rect(0, 0, 300, 200) : rect(0, 0, 0, 0)
+    })
+
+    new Lektor({ steps: [new Step({ body: 'one', element, dialogPosition })] }).start()
+    return document.querySelector('[data-lektor="dialog"]') as HTMLElement
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('keeps preferred position when dialog fits', () => {
+    const dialog = startWithElementAt(rect(100, 100, 100, 50), Position.BOTTOM)
+
+    expect(dialog.dataset.position).toBe(Position.BOTTOM)
+    expect(dialog.style.top).toBe('160px')
+    expect(dialog.style.left).toBe('100px')
+  })
+
+  it('flips to opposite side when dialog overflows bottom', () => {
+    const dialog = startWithElementAt(rect(100, 600, 100, 50), Position.BOTTOM)
+
+    expect(dialog.dataset.position).toBe(Position.TOP)
+    expect(dialog.style.top).toBe('390px')
+    expect(dialog.style.left).toBe('100px')
+  })
+
+  it('flips to opposite side when dialog overflows right', () => {
+    const dialog = startWithElementAt(rect(800, 300, 100, 50), Position.RIGHT)
+
+    expect(dialog.dataset.position).toBe(Position.LEFT)
+    expect(dialog.style.top).toBe('300px')
+    expect(dialog.style.left).toBe('490px')
+  })
+
+  it('uses side with more space when preferred and opposite side do not fit', () => {
+    const dialog = startWithElementAt(rect(0, 200, 300, 400), Position.BOTTOM)
+
+    expect(dialog.dataset.position).toBe(Position.RIGHT)
+    expect(dialog.style.top).toBe('200px')
+    expect(dialog.style.left).toBe('310px')
+  })
+
+  it('shifts dialog along the element to stay on screen', () => {
+    const dialog = startWithElementAt(rect(900, 100, 100, 50), Position.BOTTOM)
+
+    expect(dialog.dataset.position).toBe(Position.BOTTOM)
+    expect(dialog.style.left).toBe('714px')
+    expect(dialog.style.top).toBe('160px')
+  })
+
+  it('keeps dialog on screen when it fits nowhere around the element', () => {
+    const dialog = startWithElementAt(rect(0, 0, 1024, 768), Position.BOTTOM)
+
+    expect(dialog.style.top).toBe('558px')
+    expect(dialog.style.left).toBe('10px')
   })
 })
