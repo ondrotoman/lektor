@@ -12,7 +12,7 @@
   },
   "files": [
     "dist",
-    "LICENSE.md",
+    "LICENSE",
     "README.md"
   ],
   "scripts": {
@@ -30,6 +30,7 @@
   "author": "Ondrej Toman",
   "license": "MIT",
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
     "jsdom": "^30.0.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

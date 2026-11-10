@@ -1,4 +1,4 @@
-import { Position } from './enums/Position.js'
+import type { Position } from './enums/Position.js'
 import type { LektorCallbacks } from './interfaces/LektorCallbacks.js'
 import type Listener from './interfaces/Listener.js'
 import type Notifier from './interfaces/Notifier.js'
@@ -12,7 +12,7 @@ export class Step implements Notifier {
   private _previousButtonText: string | null = null
   private _nextButtonText: string | null = null
   private _endButtonText: string | null = null
-  private _dialogPosition: Position
+  private _dialogPosition: Position | null = null
   private _onMounted: ((step: Step | null, callbacks: LektorCallbacks) => void) | null = null
   private _onUnmounted: ((step: Step | null, callbacks: LektorCallbacks) => void) | null = null
 
@@ -23,7 +23,7 @@ export class Step implements Notifier {
     this._previousButtonText = params.previousButtonText ?? null
     this._nextButtonText = params.nextButtonText ?? null
     this._endButtonText = params.endButtonText ?? null
-    this._dialogPosition = params.dialogPosition ?? Position.BOTTOM
+    this._dialogPosition = params.dialogPosition ?? null
     this._onMounted = params.onMounted ?? null
     this._onUnmounted = params.onUnmounted ?? null
   }
@@ -88,7 +88,7 @@ export class Step implements Notifier {
     return this
   }
 
-  get dialogPosition(): Position {
+  get dialogPosition(): Position | null {
     return this._dialogPosition
   }
 

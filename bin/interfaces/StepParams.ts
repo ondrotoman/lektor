@@ -10,6 +10,6 @@ export default interface StepParams {
   nextButtonText?: string
   endButtonText?: string
   dialogPosition?: Position
-  onMounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
-  onUnmounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
+  onMounted?: ((step: Step | null, callbacks: LektorCallbacks) => void) | null
+  onUnmounted?: ((step: Step | null, callbacks: LektorCallbacks) => void) | null
 }

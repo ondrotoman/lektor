@@ -1,4 +1,4 @@
-import type { LektorCallbacks } from '../interfaces/LektorCallbacks.ts'
+import type { LektorCallbacks } from '../interfaces/LektorCallbacks.js'
 
 export type StepHook = <T extends HTMLElement>(
   element: T | null,
