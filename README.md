@@ -3,7 +3,7 @@
 > A lightweight, framework-agnostic, TypeScript-first library for building step-by-step tutorials, guided tours, and precisely positioned dialogs.
 
 [![npm version](https://img.shields.io/npm/v/@ondrotoman/lektor.svg)](https://www.npmjs.com/package/@ondrotoman/lektor)
-[![license](https://img.shields.io/npm/l/@ondrotoman/lektor.svg)](https://github.com/your-username/lektor/blob/main/LICENSE)
+[![license](https://img.shields.io/npm/l/@ondrotoman/lektor.svg)](https://github.com/ondrotoman/lektor/blob/main/LICENSE)
 
 ## Overview
 
@@ -82,7 +82,7 @@ const siteTour = new Lektor({
 
 ### Add steps dynamically
 
-Steps can also be added after the `Lektor` instance has been created:
+Steps can also be added after the `Lektor` instance has been created, even while the tour is running:
 
 ```ts
 siteTour.addStep(
@@ -92,6 +92,21 @@ siteTour.addStep(
   }),
 )
 ```
+
+To insert a step at a specific place, use `addStepAfter` or `addStepBefore` with a reference step. If the reference step is not part of the tour, the new step is added at the end:
+
+```ts
+siteTour.addStepAfter(newStep, existingStep)
+siteTour.addStepBefore(newStep, existingStep)
+```
+
+### Remove steps
+
+```ts
+siteTour.removeStep(existingStep)
+```
+
+If the removed step is currently active, the tour moves to the next step (or the previous one when it was the last step). When no steps remain, the tour ends.
 
 ### Create a centered message
 
@@ -116,8 +131,29 @@ const newItemStep = new Step({
 
 siteTour.addStep(newItemStep)
 
-newItemStep.setElement(document.getElementById('#item-' + id))
+newItemStep.setElement(document.getElementById('item-' + id))
 ```
+
+Changing a step's content (`setElement`, `setBody`, `setHeader`, ...) while it is active re-renders the dialog immediately.
+
+### Dialog position
+
+The dialog is placed below the highlighted element by default. You can change the default for the whole tour and override it per step:
+
+```ts
+const siteTour = new Lektor({
+  dialogPosition: Position.RIGHT,
+  steps: [
+    new Step({
+      element: document.getElementById('menu'),
+      body: 'Shown above the menu',
+      dialogPosition: Position.TOP,
+    }),
+  ],
+})
+```
+
+If the dialog does not fit in the preferred position, Lektor picks the first position where it fits.
 
 ### Start the tour
 
@@ -127,6 +163,8 @@ Once your steps have been configured, start the tour with `start()`:
 siteTour.start()
 ```
 
+Calling `start()` on a tour without steps, or on a tour that is already running, does nothing.
+
 ## Hooks
 
 Lektor provides lifecycle hooks that allow you to control the tour based on application state.
@@ -134,7 +172,7 @@ Lektor provides lifecycle hooks that allow you to control the tour based on appl
 For example, you can prevent the user from continuing until an input contains a value:
 
 ```ts
-let keyupHandler: ((e: KeyboardEvent) => void) | null = null
+let keyupHandler: (() => void) | null = null
 
 const validateInput = (value: string): boolean => {
   return value.length >= 1
@@ -145,26 +183,28 @@ new Step({
   body: 'Type whatever you want right here',
 
   onMounted: (step: Step | null, callbacks: LektorCallbacks) => {
-    if (!validateInput(step.element.value)) {
+    const input = step?.element as HTMLInputElement
+
+    if (!validateInput(input.value)) {
       callbacks.disableNext()
     }
 
     keyupHandler = () => {
-      if (validateInput(step.element.value)) {
+      if (validateInput(input.value)) {
         callbacks.enableNext()
       } else {
         callbacks.disableNext()
       }
     }
 
-    step.element.addEventListener('keyup', keyupHandler)
-    step.element.focus()
+    input.addEventListener('keyup', keyupHandler)
+    input.focus()
   },
 
-  onUnmounted: (step: Step | null, callbacks: LektorCallbacks) => {
+  onUnmounted: (step: Step | null) => {
     if (keyupHandler) {
-      callbacks.enableNext()
-      step.element.removeEventListener('keyup', keyupHandler)
+      step?.element?.removeEventListener('keyup', keyupHandler)
+      keyupHandler = null
     }
   },
 })
@@ -172,10 +212,15 @@ new Step({
 
 When the step is mounted, the **Next** action remains disabled until the input contains at least one character. The event listener is removed when the step is unmounted.
 
+Every step starts with **Previous** and **Next** enabled, so navigation disabled in one step's hook does not carry over to the following step.
+
+`onMounted` runs each time the step becomes active. `onUnmounted` runs when the tour leaves the step, or when the tour ends or is closed. Updating the active step's content does not trigger either hook.
+
 ## Keyboard navigation
 
 By default you can use `Arrow Left` to navigate to previous step, `Enter` and `Arrow Right` to go to next step and `Escape` for closing Lektor.
-Keyboard navigation can be disabled as part of `LektorParams`
+Key presses are ignored while the user is typing into an input, textarea, select or contenteditable element.
+Keyboard navigation can be disabled with `enableKeyboardNavigation: false` in `LektorParams`.
 
 # API
 
@@ -191,14 +236,18 @@ interface Lektor {
   close: () => void
   previous: () => Lektor
   next: () => Lektor
-  disablePrevious: () => Lektor
-  enablePrevious: () => Lektor
-  disableNext: () => Lektor
-  enableNext: () => Lektor
+  disablePreviousStep: () => Lektor
+  enablePreviousStep: () => Lektor
+  disableNextStep: () => Lektor
+  enableNextStep: () => Lektor
   addStep: (step: Step) => Lektor
+  addStepAfter: (step: Step, after: Step) => Lektor
+  addStepBefore: (step: Step, before: Step) => Lektor
   removeStep: (step: Step) => Lektor
 }
 ```
+
+`end()` finishes the tour and calls `onEnd`. `close()` dismisses it (close button or `Escape`) and calls `onClose`.
 
 ### Constructor parameters
 
@@ -211,7 +260,7 @@ interface LektorParams {
   endButtonText?: string
   classPrefix?: string
   dialogOffset?: number
-  dialogPositon?: Position
+  dialogPosition?: Position
   enableKeyboardNavigation?: boolean
   onStart?: () => void
   onEnd?: () => void
@@ -219,6 +268,17 @@ interface LektorParams {
   onClose?: () => void
 }
 ```
+
+| Parameter                  | Default           |
+| -------------------------- | ----------------- |
+| `header`                   | `''`              |
+| `previousButtonText`       | `'Previous'`      |
+| `nextButtonText`           | `'Next'`          |
+| `endButtonText`            | `'Done!'`         |
+| `classPrefix`              | `'lektor'`        |
+| `dialogOffset`             | `10` (pixels)     |
+| `dialogPosition`           | `Position.BOTTOM` |
+| `enableKeyboardNavigation` | `true`            |
 
 ### Lifecycle hooks
 
@@ -235,9 +295,26 @@ onClose: () => void
 
 ```ts
 interface Step {
-  setHeader: () => Step
-  setBody: () => Step
-  setElement: () => Step
+  setElement: (element: HTMLElement | null) => Step
+  setBody: (body: string) => Step
+  setHeader: (header: string | null) => Step
+  setPreviousButtonText: (text: string | null) => Step
+  setNextButtonText: (text: string | null) => Step
+  setEndButtonText: (text: string | null) => Step
+}
+```
+
+### Properties
+
+```ts
+interface Step {
+  readonly element: HTMLElement | null
+  readonly body: string
+  readonly header: string | null
+  readonly previousButtonText: string | null
+  readonly nextButtonText: string | null
+  readonly endButtonText: string | null
+  readonly dialogPosition: Position | null // null = use Lektor default
 }
 ```
 
@@ -248,11 +325,16 @@ interface StepParams {
   body: string
   element?: HTMLElement | null
   header?: string
+  previousButtonText?: string
+  nextButtonText?: string
+  endButtonText?: string
   dialogPosition?: Position
-  onMounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
-  onUnmounted?: (step: Step | null, callbacks: LektorCallbacks) => void | null
+  onMounted?: ((step: Step | null, callbacks: LektorCallbacks) => void) | null
+  onUnmounted?: ((step: Step | null, callbacks: LektorCallbacks) => void) | null
 }
 ```
+
+Step values override the matching `Lektor` values for that step only.
 
 ### Hooks
 
@@ -264,7 +346,7 @@ onUnmounted: (step: Step | null, callbacks: LektorCallbacks) => void
 
 ### Lektor callbacks
 
-Each `Step` hook receives a set of callbacks that provide access to the active `Lektor` instance:
+Each `Step` hook receives a set of callbacks that provide access to the active `Lektor` instance (note the shorter names compared to the `Lektor` methods):
 
 ```ts
 interface LektorCallbacks {
@@ -282,6 +364,24 @@ interface LektorCallbacks {
 # Styling
 
 Lektor does not impose a styling system, so you can customize its appearance to match your application.
+
+Elements get classes built from `classPrefix` (default `lektor`):
+
+| Class                    | Element                                |
+| ------------------------ | -------------------------------------- |
+| `lektor-layout`          | Wrapper of all Lektor elements         |
+| `lektor-curtain`         | Overlay behind the dialog              |
+| `lektor-dialog`          | Dialog                                 |
+| `lektor-dialog-active`   | Dialog, added on every step activation |
+| `lektor-header`          | Dialog header                          |
+| `lektor-header-content`  | Header text                            |
+| `lektor-close-button`    | Close button                           |
+| `lektor-body`            | Dialog body                            |
+| `lektor-footer`          | Dialog footer                          |
+| `lektor-previous-button` | Previous button                        |
+| `lektor-next-button`     | Next button                            |
+| `lektor-end-button`      | End button (shown on the last step)    |
+| `lektor-active-element`  | Highlighted element of the active step |
 
 The following example provides a clean starting point:
 
@@ -332,7 +432,7 @@ The following example provides a clean starting point:
   margin-bottom: 16px;
 }
 
-.lektor-text {
+.lektor-header-content {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
@@ -429,9 +529,5 @@ The following example provides a clean starting point:
 .lektor-end-button:hover {
   background-color: #63eba7;
   border-color: #63eba7;
-}
-
-.lektor-next-button:active,
-.lektor-end-button:active {
 }
 ```
